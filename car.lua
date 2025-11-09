@@ -6,7 +6,8 @@ function Car:new(x, y, image)
 	self.x = x
 	self.y = y
 	self.angle = 0
-	self.speed = 0
+	self.vx = 0
+	self.vy = 0
 	self.image = image
 	self.width = image:getWidth()
 	self.height = image:getHeight()
@@ -14,12 +15,15 @@ function Car:new(x, y, image)
 	self.baseAcceleration = 200
 	self.baseMaxSpeed = 300
 	self.braking = 350
-	self.friction = 100
+
+	self.drag = 0.1
+	self.grip = 5.0
 
 	self.steering = 0
 	self.steeringSpeed = 4
 	self.steeringReturnSpeed = 5
-	self.turnPower = 4.5
+	self.turnPower = 4
+	self.currentSpeed = 0
 
 	self.currentGear = 1
 	self.maxGear = 5
@@ -58,7 +62,9 @@ function Car:shiftDown()
 end
 
 function Car:update(dt)
-	-- turning
+	self.currentSpeed = math.sqrt(self.vx * self.vx + self.vy * self.vy)
+	-- turning --
+
 	if love.keyboard.isDown("left") then
 		self.steering = self.steering - (self.steeringSpeed * dt)
 	elseif love.keyboard.isDown("right") then
@@ -79,46 +85,52 @@ function Car:update(dt)
 
 	self.steering = math.max(-1, math.min(1, self.steering))
 
-	local turnRatio = 1.0 - (self.speed / self.baseMaxSpeed)
-
-	turnRatio = math.max(0.7, turnRatio)
-
+	local turnRatio = 1.0 - (self.currentSpeed / self.baseMaxSpeed)
+	turnRatio = math.max(0.5, turnRatio)
 	local currentTurnPower = self.turnPower * turnRatio
 
-	if self.speed ~= 0 then
+	if self.currentSpeed > 1 then
 		self.angle = self.angle + (self.steering * currentTurnPower * dt)
 	end
 
-	-- acceleration
+	local fwdX = math.cos(self.angle)
+	local fwdY = math.sin(self.angle)
+	local rightX = -fwdY
+	local rightY = fwdX
+
+	local forwardSpeed = self.vx * fwdX + self.vy * fwdY
+	local sidewaysSpeed = self.vx * rightX + self.vy * rightY
+
+	local accelForce = 0
 	if love.keyboard.isDown("up") then
-		self.speed = self.speed + (self.acceleration * dt)
+		accelForce = self.acceleration
 	elseif love.keyboard.isDown("down") then
-		self.speed = self.speed - (self.braking * dt)
-	else
-		if self.speed > 0 then
-			self.speed = self.speed - (self.friction * dt)
-		elseif self.speed < 0 then
-			self.speed = self.speed + (self.friction * dt)
-		end
-
-		if math.abs(self.speed) < 10 then
-			self.speed = 0
-		end
+		accelForce = -self.braking
 	end
 
-	-- clamp speed
-	if self.speed > self.maxSpeed then
-		self.speed = self.maxSpeed
+	local forceX = fwdX * accelForce
+	local forceY = fwdY * accelForce
+
+	forceX = forceX - rightX * sidewaysSpeed * self.grip
+	forceY = forceY - rightY * sidewaysSpeed * self.grip
+
+	forceX = forceX - self.vx * self.drag
+	forceY = forceY - self.vy * self.drag
+
+	self.vx = self.vx + forceX * dt
+	self.vy = self.vy + forceY * dt
+
+	self.currentSpeed = math.sqrt(self.vx * self.vx + self.vy * self.vy)
+
+	if self.currentSpeed > self.maxSpeed then
+		local scale = self.maxSpeed / self.currentSpeed
+		self.vx = self.vx * scale
+		self.vy = self.vy * scale
+		self.currentSpeed = self.maxSpeed
 	end
 
-	if self.speed < -self.maxSpeed / 2 then
-		self.speed = -self.maxSpeed / 2
-	end
-
-	-- 4. Update Position using trigonometry
-	-- this will move player in direction of current angle
-	self.x = self.x + (math.cos(self.angle) * self.speed * dt)
-	self.y = self.y + (math.sin(self.angle) * self.speed * dt)
+	self.x = self.x + self.vx * dt
+	self.y = self.y + self.vy * dt
 end
 
 function Car:draw()

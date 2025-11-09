@@ -30,9 +30,9 @@ function love.draw()
 	cam:detach()
 
 	love.graphics.setFont(uiFont)
-	love.graphics.print("Speed: " .. math.floor(Car.speed), 10, 10)
+	local speedKPH = math.floor(Car.currentSpeed)
 	love.graphics.print("Gear: " .. Car.currentGear, 10, 55)
-	love.graphics.print(string.format("speed: %.1f", Car.speed), 10, 25)
+	love.graphics.print(string.format("speed: %.1f", speedKPH), 10, 25)
 	love.graphics.print(string.format("Max Speed: %.1f", Car.maxSpeed), 10, 40)
 end
 
